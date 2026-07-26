@@ -52,6 +52,32 @@ The backend provides REST APIs for core product functionality, including:
 - Authentication is implemented using a **custom Supabase-based NestJS guard**
 - Protected routes use `@UseGuards`
 - Authenticated user context is extracted from the request object
+- Authorization uses a `role` column (`ADMIN` | `CUSTOMER`) on `profiles`, checked by `RolesGuard` via `@Roles('ADMIN')`
+- Product, variant, size and detail **mutations are admin-only**; all storefront `GET` endpoints stay public
+
+---
+
+## 🗄 Database Setup
+
+1. Apply the Prisma migrations (enum `UserRole`, `profiles.role` defaulting to `CUSTOMER`, schema changes):
+
+```bash
+npx prisma migrate deploy
+```
+
+2. Run the Supabase-specific provisioning SQL **separately** — it depends on `auth.users`, which only exists in a Supabase database, so it is not a Prisma migration. Paste `supabase/profile-provisioning.sql` into the Supabase SQL Editor, or:
+
+```bash
+supabase db execute --file supabase/profile-provisioning.sql
+```
+
+It creates a trigger that inserts a `profiles` row for every new `auth.users` record and backfills existing ones. It is safe to run more than once and never overwrites existing profiles.
+
+3. Promote one profile to admin (every profile is created as `CUSTOMER`):
+
+```sql
+UPDATE profiles SET role = 'ADMIN' WHERE email = '<your-admin-email>';
+```
 
 ---
 

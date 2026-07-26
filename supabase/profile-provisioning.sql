@@ -1,5 +1,11 @@
--- Provision a public.profiles row for every Supabase auth user.
--- Names come from the sign-up metadata (snake_case or camelCase), role defaults to CUSTOMER.
+-- Profile provisioning for Supabase Auth.
+--
+-- Run this directly against Supabase (SQL Editor or `supabase db execute`) AFTER the Prisma
+-- migrations have been applied. It is not a Prisma migration because it depends on auth.users,
+-- which only exists in a Supabase database.
+--
+-- Safe to run repeatedly: the function is replaced, the trigger recreated, and existing
+-- public.profiles rows (including their role) are never modified.
 
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
 RETURNS TRIGGER
