@@ -65,11 +65,13 @@ The backend provides REST APIs for core product functionality, including:
 npx prisma migrate deploy
 ```
 
-2. Run the Supabase-specific provisioning SQL **separately** — it depends on `auth.users`, which only exists in a Supabase database, so it is not a Prisma migration. Paste `supabase/profile-provisioning.sql` into the Supabase SQL Editor, or:
+2. Run the Supabase-specific provisioning SQL **manually and separately** — it depends on `auth.users`, which only exists in a Supabase database, so it is deliberately not a Prisma migration. Paste `supabase/profile-provisioning.sql` into the **Supabase SQL Editor** (which runs with the privileges required to create a trigger on `auth.users`), or run it through the Supabase CLI against the direct — not pooled — connection:
 
 ```bash
 supabase db execute --file supabase/profile-provisioning.sql
 ```
+
+Creating a trigger on `auth.users` requires ownership of that table, so this must be executed by a privileged role (the SQL Editor or the `postgres` service role). The application's runtime `DATABASE_URL` role is not expected to have those privileges, which is why the step is manual.
 
 It creates a trigger that inserts a `profiles` row for every new `auth.users` record and backfills existing ones. It is safe to run more than once and never overwrites existing profiles.
 

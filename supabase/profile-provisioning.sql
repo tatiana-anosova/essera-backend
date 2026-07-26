@@ -1,8 +1,9 @@
 -- Profile provisioning for Supabase Auth.
 --
--- Run this directly against Supabase (SQL Editor or `supabase db execute`) AFTER the Prisma
--- migrations have been applied. It is not a Prisma migration because it depends on auth.users,
--- which only exists in a Supabase database.
+-- Run this manually against Supabase (SQL Editor, or `supabase db execute` on the direct
+-- connection) AFTER the Prisma migrations have been applied. It is not a Prisma migration
+-- because it depends on auth.users, which only exists in a Supabase database, and creating a
+-- trigger there requires a privileged role rather than the app's runtime DATABASE_URL role.
 --
 -- Safe to run repeatedly: the function is replaced, the trigger recreated, and existing
 -- public.profiles rows (including their role) are never modified.
