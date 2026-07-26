@@ -55,6 +55,19 @@ The backend provides REST APIs for core product functionality, including:
 - Authorization uses a `role` column (`ADMIN` | `CUSTOMER`) on `profiles`, checked by `RolesGuard` via `@Roles('ADMIN')`
 - Product, variant, size and detail **mutations are admin-only**; all storefront `GET` endpoints stay public
 
+### Token verification
+
+The project uses Supabase **asymmetric JWT signing keys**, so `SupabaseAuthGuard` verifies access tokens locally against the project's JWKS — the recommended approach: the public key is fetched once from `<SUPABASE_URL>/auth/v1/.well-known/jwks.json`, cached by `jose`, and no signing secret is ever stored in this service. Legacy HS256 tokens are rejected.
+
+Each token is checked for signature (`ES256`/`RS256` only), issuer (`<SUPABASE_URL>/auth/v1`), audience and expiry; `sub` and `email` are then exposed as `req.user`.
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `SUPABASE_URL` | **yes** | Project URL; also the expected issuer and the source of the JWKS URL. The app refuses to start without it, so issuer validation can never be skipped |
+| `SUPABASE_JWT_AUD` | no | Expected audience, defaults to `authenticated` |
+
+A rejected token logs one `SupabaseAuthGuard` warning with the issuer, JWKS URL and the underlying jose error — never the token itself.
+
 ---
 
 ## 🗄 Database Setup
