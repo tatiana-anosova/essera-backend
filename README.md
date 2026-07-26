@@ -55,6 +55,24 @@ The backend provides REST APIs for core product functionality, including:
 - Authorization uses a `role` column (`ADMIN` | `CUSTOMER`) on `profiles`, checked by `RolesGuard` via `@Roles('ADMIN')`
 - Product, variant, size and detail **mutations are admin-only**; all storefront `GET` endpoints stay public
 
+### Token verification
+
+`SupabaseAuthGuard` picks the verification key from the token's `alg` header, because Supabase signs access tokens differently depending on the project:
+
+| Project setting | Token `alg` | Required env |
+| --- | --- | --- |
+| Legacy JWT secret | `HS256` | `SUPABASE_JWT_SECRET` (Supabase → Settings → API → JWT Settings) |
+| Asymmetric signing keys | `ES256` / `RS256` | none — the key is fetched from the project's JWKS |
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `SUPABASE_URL` | yes | Project URL; also the expected issuer (`<url>/auth/v1`) |
+| `SUPABASE_JWT_SECRET` | only for HS256 projects | Legacy JWT secret |
+| `SUPABASE_JWKS_URL` | no | Overrides the derived `<SUPABASE_URL>/auth/v1/.well-known/jwks.json` |
+| `SUPABASE_JWT_AUD` | no | Expected audience, defaults to `authenticated` |
+
+Tokens are also checked against the expected issuer and audience. A rejected token logs one `SupabaseAuthGuard` warning with the `alg`, `kid`, issuer, JWKS URL and the underlying jose error — never the token itself.
+
 ---
 
 ## 🗄 Database Setup
