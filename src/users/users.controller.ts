@@ -1,5 +1,6 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
+import { UserRole } from '@prisma/client';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { UsersService } from './users.service';
 
@@ -17,6 +18,7 @@ export class UsersController {
       firstName: profile?.firstName ?? '',
       lastName: profile?.lastName ?? '',
       email: profile?.email ?? email ?? '',
+      role: profile?.role ?? UserRole.CUSTOMER,
     };
   }
 }

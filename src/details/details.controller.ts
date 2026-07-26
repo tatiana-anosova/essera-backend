@@ -1,7 +1,21 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  ParseIntPipe,
+  UseGuards,
+} from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { DetailsService } from './details.service';
 import { plainToInstance } from 'class-transformer';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { CreateDetailDto, UpdateDetailDto, DetailsResponseDto } from './dto';
 
 @ApiTags('Details')
@@ -27,6 +41,8 @@ export class DetailsController {
     });
   }
 
+  @UseGuards(SupabaseAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Post(':productId/details')
   add(
     @Param('productId', ParseIntPipe) productId: number,
@@ -35,6 +51,8 @@ export class DetailsController {
     return this.detailsService.add(productId, dto);
   }
 
+  @UseGuards(SupabaseAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Put('/details/:detailId')
   update(
     @Param('detailId', ParseIntPipe) detailId: number,
@@ -43,6 +61,8 @@ export class DetailsController {
     return this.detailsService.update(detailId, dto);
   }
 
+  @UseGuards(SupabaseAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Delete('/details/:detailId')
   remove(@Param('detailId', ParseIntPipe) detailId: number) {
     return this.detailsService.remove(detailId);

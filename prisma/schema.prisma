@@ -100,11 +100,17 @@ model Detail {
   productId Int
 }
 
+enum UserRole {
+  ADMIN
+  CUSTOMER
+}
+
 model Profile {
   userId    String    @id @db.Uuid @map("user_id")
   firstName String?   @map("first_name")
   lastName  String?   @map("last_name")
   email     String?   @unique
+  role      UserRole  @default(CUSTOMER)
   createdAt DateTime  @default(now()) @map("created_at")
 
   @@map("profiles")
