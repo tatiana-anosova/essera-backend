@@ -66,12 +66,14 @@ The backend provides REST APIs for core product functionality, including:
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `SUPABASE_URL` | yes | Project URL; also the expected issuer (`<url>/auth/v1`) |
-| `SUPABASE_JWT_SECRET` | only for HS256 projects | Legacy JWT secret |
+| `SUPABASE_URL` | **yes** | Project URL; also the expected issuer (`<url>/auth/v1`). The app refuses to start without it, so issuer validation can never be skipped |
+| `SUPABASE_JWT_SECRET` | only for HS256 projects | The project's **legacy JWT secret** — the HMAC signing key under Settings → API → JWT Settings. It is *not* the anon key, the service-role key or the publishable key, and it must never be sent to a client |
 | `SUPABASE_JWKS_URL` | no | Overrides the derived `<SUPABASE_URL>/auth/v1/.well-known/jwks.json` |
 | `SUPABASE_JWT_AUD` | no | Expected audience, defaults to `authenticated` |
 
-Tokens are also checked against the expected issuer and audience. A rejected token logs one `SupabaseAuthGuard` warning with the `alg`, `kid`, issuer, JWKS URL and the underlying jose error — never the token itself.
+Only `HS256` (legacy secret) and `ES256` / `RS256` (JWKS) are accepted, and the algorithm is pinned per branch — any other or missing `alg` is rejected without touching the JWKS. Tokens are also checked against the expected issuer and audience. A missing `SUPABASE_JWT_SECRET` is reported as a server misconfiguration (500), not as an invalid token.
+
+A rejected token logs one `SupabaseAuthGuard` warning with the `alg`, `kid`, issuer, JWKS URL and the underlying jose error — never the token or the secret.
 
 ---
 

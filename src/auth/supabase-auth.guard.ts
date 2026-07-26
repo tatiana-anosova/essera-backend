@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  InternalServerErrorException,
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -14,6 +15,11 @@ type Jwks = ReturnType<typeof createRemoteJWKSet>;
 const importJose = () => import('jose');
 
 const DEFAULT_AUDIENCE = 'authenticated';
+const SYMMETRIC_ALG = 'HS256';
+const ASYMMETRIC_ALGS = ['ES256', 'RS256'];
+
+/** A server-side misconfiguration — not something the caller's token can be blamed for. */
+class ConfigurationError extends Error {}
 
 /**
  * Supabase signs access tokens either with the project's legacy HS256 JWT secret or, once the
@@ -24,19 +30,23 @@ const DEFAULT_AUDIENCE = 'authenticated';
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
   private readonly logger = new Logger(SupabaseAuthGuard.name);
+  private readonly issuer: string;
+  private readonly jwksUrl: string;
   private jwksPromise?: Promise<Jwks>;
 
-  private get jwksUrl(): string {
-    const configured = process.env.SUPABASE_JWKS_URL;
-    if (configured) return configured;
+  constructor() {
+    const baseUrl = (process.env.SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
 
-    const base = (process.env.SUPABASE_URL ?? '').replace(/\/+$/, '');
-    return `${base}/auth/v1/.well-known/jwks.json`;
-  }
+    if (!baseUrl) {
+      throw new Error(
+        'SUPABASE_URL is required: it is the expected token issuer and the source of the JWKS URL',
+      );
+    }
 
-  private get issuer(): string | undefined {
-    const base = (process.env.SUPABASE_URL ?? '').replace(/\/+$/, '');
-    return base ? `${base}/auth/v1` : undefined;
+    this.issuer = `${baseUrl}/auth/v1`;
+    this.jwksUrl =
+      process.env.SUPABASE_JWKS_URL ??
+      `${baseUrl}/auth/v1/.well-known/jwks.json`;
   }
 
   private getJwks(): Promise<Jwks> {
@@ -69,9 +79,16 @@ export class SupabaseAuthGuard implements CanActivate {
         audience: process.env.SUPABASE_JWT_AUD ?? DEFAULT_AUDIENCE,
       };
 
-      const { payload } = alg?.startsWith('HS')
-        ? await jwtVerify(token, this.hmacSecret(), options)
-        : await jwtVerify(token, await this.getJwks(), options);
+      const { payload } =
+        alg === SYMMETRIC_ALG
+          ? await jwtVerify(token, this.hmacSecret(), {
+              ...options,
+              algorithms: [SYMMETRIC_ALG],
+            })
+          : await jwtVerify(token, await this.assertAsymmetric(alg), {
+              ...options,
+              algorithms: ASYMMETRIC_ALGS,
+            });
 
       req.user = {
         id: payload.sub as string,
@@ -80,23 +97,37 @@ export class SupabaseAuthGuard implements CanActivate {
 
       return true;
     } catch (error) {
-      // Never log the token itself — only what is needed to tell the failure modes apart.
+      // Never log the token or the signing secret — only what tells the failure modes apart.
       this.logger.warn(
         `Token verification failed (alg=${alg ?? 'unknown'} kid=${kid ?? 'none'} ` +
-          `issuer=${this.issuer ?? 'unset'} jwks=${this.jwksUrl}): ` +
+          `issuer=${this.issuer} jwks=${this.jwksUrl}): ` +
           `${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`,
       );
 
+      if (error instanceof ConfigurationError) {
+        throw new InternalServerErrorException(
+          'Token verification is not configured',
+        );
+      }
+
       throw new UnauthorizedException('Invalid token');
     }
+  }
+
+  private async assertAsymmetric(alg: string | undefined): Promise<Jwks> {
+    if (!alg || !ASYMMETRIC_ALGS.includes(alg)) {
+      throw new Error(`Unsupported token algorithm: ${alg ?? 'none'}`);
+    }
+
+    return this.getJwks();
   }
 
   private hmacSecret(): Uint8Array {
     const secret = process.env.SUPABASE_JWT_SECRET;
 
     if (!secret) {
-      throw new Error(
-        'SUPABASE_JWT_SECRET is not set; it is required to verify HS256 Supabase tokens',
+      throw new ConfigurationError(
+        'SUPABASE_JWT_SECRET is not set; it is required to verify legacy HS256 Supabase tokens',
       );
     }
 

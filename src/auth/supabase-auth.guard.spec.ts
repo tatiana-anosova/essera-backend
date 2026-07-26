@@ -1,4 +1,8 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 
 const SUPABASE_URL = 'https://project.supabase.co';
@@ -97,9 +101,46 @@ describe('SupabaseAuthGuard', () => {
     );
   });
 
+  it('refuses to start without SUPABASE_URL rather than skipping issuer validation', () => {
+    delete process.env.SUPABASE_URL;
+
+    expect(() => new SupabaseAuthGuard()).toThrow(/SUPABASE_URL is required/);
+  });
+
+  it('reports a missing SUPABASE_JWT_SECRET as a configuration error, not a bad token', async () => {
+    delete process.env.SUPABASE_JWT_SECRET;
+
+    const { ctx } = context({
+      authorization: `Bearer ${await signHs256(validClaims)}`,
+    });
+
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
+  });
+
+  it('rejects an unsupported algorithm instead of falling back to the JWKS', async () => {
+    const { SignJWT } = await import('jose');
+    const token = await new SignJWT(validClaims)
+      .setProtectedHeader({ alg: 'HS512' })
+      .setExpirationTime('1h')
+      .sign(new TextEncoder().encode(JWT_SECRET));
+
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    const { ctx } = context({ authorization: `Bearer ${token}` });
+
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    fetchSpy.mockRestore();
+  });
+
   it('verifies asymmetric tokens against the configured JWKS URL', async () => {
     process.env.SUPABASE_JWKS_URL =
       'https://project.supabase.co/custom/jwks.json';
+    guard = new SupabaseAuthGuard();
 
     const { SignJWT, generateKeyPair, exportJWK } = await import('jose');
     const { privateKey, publicKey } = await generateKeyPair('ES256', {
