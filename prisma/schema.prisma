@@ -21,17 +21,6 @@ enum ProductLabel {
   empty // for ""
 }
 
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  firstName String
-  lastName  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  orders    Order[]
-}
-
 model Product {
   id            Int      @id @default(autoincrement())
   slug          String   @unique
@@ -46,7 +35,6 @@ model Product {
   category      String?
   brand         String?
   variants      ProductVariant[]
-  orderItems    OrderItem[]
   details       Detail[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -71,24 +59,6 @@ model ProductSize {
   size       String
   inStock    Boolean
   quantity   Int
-}
-
-model Order {
-  id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    Int
-  createdAt DateTime @default(now())
-  items     OrderItem[]
-}
-
-model OrderItem {
-  id        Int      @id @default(autoincrement())
-  order     Order    @relation(fields: [orderId], references: [id])
-  orderId   Int
-  product   Product  @relation(fields: [productId], references: [id])
-  productId Int
-  quantity  Int
-  price     Float
 }
 
 model Detail {
