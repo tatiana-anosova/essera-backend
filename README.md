@@ -52,6 +52,34 @@ The backend provides REST APIs for core product functionality, including:
 - Authentication is implemented using a **custom Supabase-based NestJS guard**
 - Protected routes use `@UseGuards`
 - Authenticated user context is extracted from the request object
+- Authorization uses a `role` column (`ADMIN` | `CUSTOMER`) on `profiles`, checked by `RolesGuard` via `@Roles('ADMIN')`
+- Product, variant, size and detail **mutations are admin-only**; all storefront `GET` endpoints stay public
+
+---
+
+## 🗄 Database Setup
+
+1. Apply the Prisma migrations (enum `UserRole`, `profiles.role` defaulting to `CUSTOMER`, schema changes):
+
+```bash
+npx prisma migrate deploy
+```
+
+2. Run the Supabase-specific provisioning SQL **manually and separately** — it depends on `auth.users`, which only exists in a Supabase database, so it is deliberately not a Prisma migration. Paste `supabase/profile-provisioning.sql` into the **Supabase SQL Editor** (which runs with the privileges required to create a trigger on `auth.users`), or run it through the Supabase CLI against the direct — not pooled — connection:
+
+```bash
+supabase db execute --file supabase/profile-provisioning.sql
+```
+
+Creating a trigger on `auth.users` requires ownership of that table, so this must be executed by a privileged role (the SQL Editor or the `postgres` service role). The application's runtime `DATABASE_URL` role is not expected to have those privileges, which is why the step is manual.
+
+It creates a trigger that inserts a `profiles` row for every new `auth.users` record and backfills existing ones. It is safe to run more than once and never overwrites existing profiles.
+
+3. Promote one profile to admin (every profile is created as `CUSTOMER`):
+
+```sql
+UPDATE profiles SET role = 'ADMIN' WHERE email = '<your-admin-email>';
+```
 
 ---
 
