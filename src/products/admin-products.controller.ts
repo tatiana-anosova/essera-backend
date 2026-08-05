@@ -66,7 +66,11 @@ export class AdminProductsController {
     return this.productsService.findAllForAdmin(status);
   }
 
-  @ApiOperation({ summary: 'Read a product of any status' })
+  @ApiOperation({
+    summary: 'Read a product of any status',
+    description:
+      'Includes the details, which the public details endpoints only serve for `ACTIVE` products.',
+  })
   @ApiOkResponse({ type: ProductResponseDto })
   @ApiNotFoundResponse({ description: 'Product not found' })
   @Get(':id')

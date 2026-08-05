@@ -103,7 +103,9 @@ export class ProductsService {
   async findOneForAdmin(id: number) {
     const product = await this.prisma.product.findUnique({
       where: { id },
-      include: withVariants,
+      // The public details reads are gated on ACTIVE, so this is where an admin sees the details
+      // of a product that is still a draft, or already archived.
+      include: { ...withVariants, details: true },
     });
 
     if (!product) throw new NotFoundException('Product not found');

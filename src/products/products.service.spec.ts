@@ -169,6 +169,17 @@ describe('ProductsService', () => {
       },
     );
 
+    it('reads the details along with a product of any status', async () => {
+      stored = ProductStatus.DRAFT;
+
+      await service.findOneForAdmin(1);
+
+      const [{ include }] = prisma.product.findUnique.mock.calls[0] as [
+        { include: Record<string, unknown> },
+      ];
+      expect(include).toMatchObject({ details: true });
+    });
+
     it('answers not found for an unknown id', async () => {
       stored = null;
 
