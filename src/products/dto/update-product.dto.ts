@@ -1,12 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsString, IsNumber, IsArray, IsOptional, ValidateNested } from 'class-validator';
+import { IsEnum, IsString, IsNumber, IsOptional } from 'class-validator';
 import { ProductLabel } from '@prisma/client';
-import { Type } from 'class-transformer';
-import { CreateProductVariantDto } from './';
 
-/** `status` is deliberately absent: it changes through publish, archive and restore. */
+/**
+ * `status` is deliberately absent: it changes through publish, archive and restore. So are
+ * `variants`, which are managed through the variant and size endpoints only.
+ */
 export class UpdateProductDto {
-
   @ApiProperty({ example: 'white-bra' })
   @IsString()
   slug: string;
@@ -15,7 +15,10 @@ export class UpdateProductDto {
   @IsString()
   title: string;
 
-  @ApiProperty({ example: 'Minimal lingerie for women who choose calm, confidence, and comfort.' })
+  @ApiProperty({
+    example:
+      'Minimal lingerie for women who choose calm, confidence, and comfort.',
+  })
   @IsString()
   description: string;
 
@@ -51,11 +54,4 @@ export class UpdateProductDto {
   @ApiProperty({ example: 120, required: false })
   @IsNumber()
   reviewsCount: number;
-
-  @ApiProperty({ type: [CreateProductVariantDto], required: false })
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateProductVariantDto)
-  variants?: CreateProductVariantDto[];
 }

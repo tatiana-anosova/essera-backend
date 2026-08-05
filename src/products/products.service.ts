@@ -285,24 +285,6 @@ export class ProductsService {
     });
   }
 
-  // DETAILS
-  async getDetailsByProductId(productId: number) {
-    return this.prisma.detail.findMany({
-      where: { productId },
-    });
-  }
-
-  async getDetailsByProductSlug(slug: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { slug },
-      select: { id: true },
-    });
-    if (!product) throw new NotFoundException('Product not found');
-    return this.prisma.detail.findMany({
-      where: { productId: product.id },
-    });
-  }
-
   async addDetail(
     productId: number,
     dto: { key: string; title: string; content: string },

@@ -174,9 +174,8 @@ describe('ProductsService', () => {
 
       await service.findOneForAdmin(1);
 
-      const [{ include }] = prisma.product.findUnique.mock.calls[0] as [
-        { include: Record<string, unknown> },
-      ];
+      const [{ include }] = prisma.product.findUnique.mock
+        .calls[0] as unknown[] as [{ include: Record<string, unknown> }];
       expect(include).toMatchObject({ details: true });
     });
 
