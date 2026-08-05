@@ -4,6 +4,7 @@ import { ProductLabel } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { CreateProductVariantDto } from './';
 
+/** `status` is deliberately absent: it changes through publish, archive and restore. */
 export class UpdateProductDto {
 
   @ApiProperty({ example: 'white-bra' })
