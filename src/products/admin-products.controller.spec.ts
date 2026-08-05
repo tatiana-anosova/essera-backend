@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductStatus, UserRole } from '@prisma/client';
-import { AdminProductsController } from './admin-products.controller';
+import {
+  AdminProductsController,
+  BlankAsUnsetPipe,
+} from './admin-products.controller';
 import { ProductsService } from './products.service';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -65,6 +68,15 @@ describe('AdminProductsController', () => {
       2,
       ProductStatus.ARCHIVED,
     );
+  });
+
+  it('reads an empty status query as no filter, and keeps real values', () => {
+    const pipe = new BlankAsUnsetPipe();
+
+    expect(pipe.transform('')).toBeUndefined();
+    expect(pipe.transform(undefined)).toBeUndefined();
+    expect(pipe.transform(ProductStatus.DRAFT)).toBe(ProductStatus.DRAFT);
+    expect(pipe.transform('nonsense')).toBe('nonsense');
   });
 
   it('reads, creates, updates and deletes through the admin service methods', async () => {

@@ -5,7 +5,14 @@ import {
 } from '@nestjs/common';
 import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateProductDto, UpdateProductDto, CreateProductVariantDto, UpdateProductVariantDto, CreateProductSizeDto, UpdateProductSizeDto } from './dto';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  CreateProductVariantDto,
+  UpdateProductVariantDto,
+  CreateProductSizeDto,
+  UpdateProductSizeDto,
+} from './dto';
 
 const withVariants = {
   variants: {
@@ -13,6 +20,42 @@ const withVariants = {
       sizes: true,
     },
   },
+};
+
+/**
+ * The only product columns ever written from a request body. Listing them explicitly keeps `id`,
+ * `status`, `createdAt`, `updatedAt` and anything a client invents out of Prisma, which matters
+ * because the global validation pipe does not whitelist. Prisma ignores an `undefined`, while an
+ * explicit `null` still clears a nullable column such as `discountPrice`.
+ */
+const productData = (dto: CreateProductDto | UpdateProductDto) => {
+  const {
+    slug,
+    title,
+    description,
+    category,
+    brand,
+    basePrice,
+    discount,
+    discountPrice,
+    label,
+    rating,
+    reviewsCount,
+  } = dto;
+
+  return {
+    slug,
+    title,
+    description,
+    category,
+    brand,
+    basePrice,
+    discount,
+    discountPrice,
+    label,
+    rating,
+    reviewsCount,
+  };
 };
 
 @Injectable()
@@ -69,14 +112,14 @@ export class ProductsService {
   }
 
   async create(createProductDto: CreateProductDto) {
-    const { variants = [], ...rest } = createProductDto;
+    const { variants = [] } = createProductDto;
     return this.prisma.product.create({
       data: {
-        ...this.withoutStatus(rest),
+        ...productData(createProductDto),
         // A product is always born as a draft; publishing is an explicit action.
         status: ProductStatus.DRAFT,
         variants: {
-          create: (variants ?? []).map( variant => ({
+          create: (variants ?? []).map((variant) => ({
             ...variant,
             sizes: {
               create: variant.sizes,
@@ -89,46 +132,47 @@ export class ProductsService {
   }
 
   async update(id: number, updateProductDto: UpdateProductDto) {
-    await this.findOneForAdmin(id);
+    await this.assertExists(id);
 
-    const { variants, ...rest } = updateProductDto;
-
-    // If there are no variants — just update product
+    // `variants` is deliberately not persisted here; the variant endpoints own them.
     return this.prisma.product.update({
       where: { id },
-      data: this.withoutStatus(rest),
+      data: productData(updateProductDto),
       include: withVariants,
     });
   }
 
+  /**
+   * The delete is conditional on the product still being a draft, so a publish that lands in
+   * between rolls the whole transaction back, children included.
+   */
   async remove(id: number) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-      select: { status: true },
-    });
-
-    if (!product) throw new NotFoundException('Product not found');
-
-    if (product.status !== ProductStatus.DRAFT) {
-      throw new ConflictException(
-        'Only draft products can be permanently deleted',
-      );
-    }
-
-    // Variants, sizes and details reference the product, so they go first.
     return this.prisma.$transaction(async (tx) => {
-      const variants = await tx.productVariant.findMany({
-        where: { productId: id },
-        select: { id: true },
+      const product = await tx.product.findUnique({
+        where: { id },
+        include: withVariants,
       });
 
+      if (!product) throw new NotFoundException('Product not found');
+
+      // Variants, sizes and details reference the product, so they go first.
       await tx.productSize.deleteMany({
-        where: { variantId: { in: variants.map((variant) => variant.id) } },
+        where: { variant: { productId: id } },
       });
       await tx.productVariant.deleteMany({ where: { productId: id } });
       await tx.detail.deleteMany({ where: { productId: id } });
 
-      return tx.product.delete({ where: { id } });
+      const { count } = await tx.product.deleteMany({
+        where: { id, status: ProductStatus.DRAFT },
+      });
+
+      if (count === 0) {
+        throw new ConflictException(
+          'Only draft products can be permanently deleted',
+        );
+      }
+
+      return product;
     });
   }
 
@@ -159,36 +203,37 @@ export class ProductsService {
     );
   }
 
+  /**
+   * The expected source status is part of the write, so two concurrent transitions cannot both
+   * win: the loser updates no row and is reported as a conflict.
+   */
   private async transition(
     id: number,
     from: ProductStatus,
     to: ProductStatus,
     conflict: string,
   ) {
+    const { count } = await this.prisma.product.updateMany({
+      where: { id, status: from },
+      data: { status: to },
+    });
+
+    if (count === 0) {
+      await this.assertExists(id);
+
+      throw new ConflictException(conflict);
+    }
+
+    return this.findOneForAdmin(id);
+  }
+
+  private async assertExists(id: number) {
     const product = await this.prisma.product.findUnique({
       where: { id },
-      select: { status: true },
+      select: { id: true },
     });
 
     if (!product) throw new NotFoundException('Product not found');
-    if (product.status !== from) throw new ConflictException(conflict);
-
-    return this.prisma.product.update({
-      where: { id },
-      data: { status: to },
-      include: withVariants,
-    });
-  }
-
-  /**
-   * The create and update DTOs carry no `status`, and the global validation pipe does not
-   * whitelist, so an unexpected one is dropped here rather than reaching the database.
-   */
-  private withoutStatus<T extends object>(data: T): Omit<T, 'status'> {
-    const rest = { ...data } as T & { status?: unknown };
-    delete rest.status;
-
-    return rest;
   }
 
   // VARIANTS
@@ -256,7 +301,10 @@ export class ProductsService {
     });
   }
 
-  async addDetail(productId: number, dto: { key: string; title: string; content: string }) {
+  async addDetail(
+    productId: number,
+    dto: { key: string; title: string; content: string },
+  ) {
     return this.prisma.detail.create({
       data: {
         ...dto,
@@ -265,7 +313,10 @@ export class ProductsService {
     });
   }
 
-  async updateDetail(detailId: number, dto: { key?: string; title?: string; content?: string }) {
+  async updateDetail(
+    detailId: number,
+    dto: { key?: string; title?: string; content?: string },
+  ) {
     return this.prisma.detail.update({
       where: { id: detailId },
       data: dto,

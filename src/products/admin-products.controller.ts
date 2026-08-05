@@ -7,12 +7,14 @@ import {
   Param,
   ParseEnumPipe,
   ParseIntPipe,
+  PipeTransform,
   Post,
   Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -29,6 +31,13 @@ import { Roles } from '../auth/roles.decorator';
 import { ProductsService } from './products.service';
 import { CreateProductDto, ProductResponseDto, UpdateProductDto } from './dto';
 
+/** `?status=` with no value means "no filter", rather than an invalid enum value. */
+export class BlankAsUnsetPipe implements PipeTransform<string | undefined> {
+  transform(value: string | undefined) {
+    return value === '' ? undefined : value;
+  }
+}
+
 @ApiTags('admin/products')
 @ApiBearerAuth()
 @UseGuards(SupabaseAuthGuard, RolesGuard)
@@ -44,9 +53,14 @@ export class AdminProductsController {
   })
   @ApiQuery({ name: 'status', enum: ProductStatus, required: false })
   @ApiOkResponse({ type: ProductResponseDto, isArray: true })
+  @ApiBadRequestResponse({ description: 'Unknown `status`' })
   @Get()
   findAll(
-    @Query('status', new ParseEnumPipe(ProductStatus, { optional: true }))
+    @Query(
+      'status',
+      new BlankAsUnsetPipe(),
+      new ParseEnumPipe(ProductStatus, { optional: true }),
+    )
     status?: ProductStatus,
   ) {
     return this.productsService.findAllForAdmin(status);

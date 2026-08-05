@@ -5,16 +5,58 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto } from './dto';
 
+interface StatusWhere {
+  id?: number;
+  slug?: string;
+  status?: ProductStatus;
+}
+
+/** The single product the fake Prisma below holds; `null` means it is gone. */
+let stored: ProductStatus | null = ProductStatus.DRAFT;
+
+const matches = (where: StatusWhere) =>
+  stored !== null &&
+  (where.id === undefined || where.id === 1) &&
+  (where.slug === undefined || where.slug === 'white-bra') &&
+  (where.status === undefined || where.status === stored);
+
+const found = () => ({ id: 1, slug: 'white-bra', status: stored });
+
 const prisma = {
   product: {
     findMany: jest.fn(),
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
+    findFirst: jest.fn(({ where }: { where: StatusWhere }) =>
+      Promise.resolve(matches(where) ? found() : null),
+    ),
+    findUnique: jest.fn(({ where }: { where: StatusWhere }) =>
+      Promise.resolve(matches(where) ? found() : null),
+    ),
     create: jest.fn(),
     update: jest.fn(),
-    delete: jest.fn(),
+    updateMany: jest.fn(
+      ({
+        where,
+        data,
+      }: {
+        where: StatusWhere;
+        data: { status: ProductStatus };
+      }) => {
+        if (!matches(where)) return Promise.resolve({ count: 0 });
+
+        stored = data.status;
+
+        return Promise.resolve({ count: 1 });
+      },
+    ),
+    deleteMany: jest.fn(({ where }: { where: StatusWhere }) => {
+      if (!matches(where)) return Promise.resolve({ count: 0 });
+
+      stored = null;
+
+      return Promise.resolve({ count: 1 });
+    }),
   },
-  productVariant: { findMany: jest.fn(), deleteMany: jest.fn() },
+  productVariant: { deleteMany: jest.fn() },
   productSize: { deleteMany: jest.fn() },
   detail: { deleteMany: jest.fn() },
   $transaction: jest.fn(),
@@ -34,8 +76,8 @@ const productDto = {
   variants: [],
 };
 
-const createdWith = () => {
-  const [{ data }] = prisma.product.create.mock.calls[0] as [{ data: object }];
+const dataOf = (mock: jest.Mock) => {
+  const [{ data }] = mock.mock.calls[0] as [{ data: Record<string, unknown> }];
 
   return data;
 };
@@ -45,6 +87,7 @@ describe('ProductsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    stored = ProductStatus.DRAFT;
     prisma.$transaction.mockImplementation((run: (tx: unknown) => unknown) =>
       run(prisma),
     );
@@ -70,39 +113,28 @@ describe('ProductsService', () => {
       );
     });
 
-    it('reads a product by id only when it is active', async () => {
-      prisma.product.findFirst.mockResolvedValue({ id: 1 });
+    it('reads an active product by id and by slug', async () => {
+      stored = ProductStatus.ACTIVE;
 
-      await expect(service.findOne(1)).resolves.toEqual({ id: 1 });
-      expect(prisma.product.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 1, status: ProductStatus.ACTIVE },
-        }),
-      );
+      await expect(service.findOne(1)).resolves.toMatchObject({ id: 1 });
+      await expect(service.findBySlug('white-bra')).resolves.toMatchObject({
+        id: 1,
+      });
     });
 
-    it('reads a product by slug only when it is active', async () => {
-      prisma.product.findFirst.mockResolvedValue({ slug: 'white-bra' });
+    it.each([ProductStatus.DRAFT, ProductStatus.ARCHIVED])(
+      'hides a %s product behind a not found, by id and by slug',
+      async (status) => {
+        stored = status;
 
-      await service.findBySlug('white-bra');
-
-      expect(prisma.product.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { slug: 'white-bra', status: ProductStatus.ACTIVE },
-        }),
-      );
-    });
-
-    it('hides a draft or archived product behind a not found', async () => {
-      prisma.product.findFirst.mockResolvedValue(null);
-
-      await expect(service.findOne(1)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
-      await expect(service.findBySlug('draft')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
-    });
+        await expect(service.findOne(1)).rejects.toBeInstanceOf(
+          NotFoundException,
+        );
+        await expect(service.findBySlug('white-bra')).rejects.toBeInstanceOf(
+          NotFoundException,
+        );
+      },
+    );
   });
 
   describe('admin reads', () => {
@@ -126,64 +158,96 @@ describe('ProductsService', () => {
       );
     });
 
-    it('reads a product of any status by id', async () => {
-      prisma.product.findUnique.mockResolvedValue({
-        id: 1,
-        status: ProductStatus.ARCHIVED,
-      });
+    it.each(Object.values(ProductStatus))(
+      'reads a %s product by id',
+      async (status) => {
+        stored = status;
 
-      await expect(service.findOneForAdmin(1)).resolves.toEqual({
-        id: 1,
-        status: ProductStatus.ARCHIVED,
-      });
-    });
+        await expect(service.findOneForAdmin(1)).resolves.toMatchObject({
+          status,
+        });
+      },
+    );
 
     it('answers not found for an unknown id', async () => {
-      prisma.product.findUnique.mockResolvedValue(null);
+      stored = null;
 
-      await expect(service.findOneForAdmin(9)).rejects.toBeInstanceOf(
+      await expect(service.findOneForAdmin(1)).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
   });
 
   describe('create and update', () => {
+    const smuggled = {
+      ...productDto,
+      id: 99,
+      status: ProductStatus.ACTIVE,
+      createdAt: '2020-01-01',
+      updatedAt: '2020-01-01',
+      nonsense: true,
+    };
+
     it('creates a draft', async () => {
       prisma.product.create.mockResolvedValue({ id: 1 });
 
       await service.create(productDto as unknown as CreateProductDto);
 
-      expect(createdWith()).toMatchObject({ status: ProductStatus.DRAFT });
+      expect(dataOf(prisma.product.create)).toMatchObject({
+        status: ProductStatus.DRAFT,
+        title: 'White bra',
+      });
     });
 
-    it('ignores a status smuggled into the create body', async () => {
+    it('writes only allowlisted columns on create', async () => {
       prisma.product.create.mockResolvedValue({ id: 1 });
 
-      await service.create({
-        ...productDto,
-        status: ProductStatus.ACTIVE,
-      } as unknown as CreateProductDto);
+      await service.create(smuggled as unknown as CreateProductDto);
 
-      expect(createdWith()).toMatchObject({ status: ProductStatus.DRAFT });
+      const data = dataOf(prisma.product.create);
+      expect(data.status).toBe(ProductStatus.DRAFT);
+      expect(data).not.toHaveProperty('id');
+      expect(data).not.toHaveProperty('createdAt');
+      expect(data).not.toHaveProperty('updatedAt');
+      expect(data).not.toHaveProperty('nonsense');
     });
 
-    it('ignores a status smuggled into the update body', async () => {
-      prisma.product.findUnique.mockResolvedValue({
-        id: 1,
-        status: ProductStatus.DRAFT,
-      });
+    it('writes only allowlisted columns on update', async () => {
+      prisma.product.update.mockResolvedValue({ id: 1 });
+
+      await service.update(1, smuggled as unknown as UpdateProductDto);
+
+      const data = dataOf(prisma.product.update);
+      expect(data).toMatchObject({ title: 'White bra' });
+      expect(data).not.toHaveProperty('status');
+      expect(data).not.toHaveProperty('id');
+      expect(data).not.toHaveProperty('createdAt');
+      expect(data).not.toHaveProperty('updatedAt');
+      expect(data).not.toHaveProperty('nonsense');
+      expect(data).not.toHaveProperty('variants');
+    });
+
+    it('clears a nullable column when the body says null', async () => {
       prisma.product.update.mockResolvedValue({ id: 1 });
 
       await service.update(1, {
         ...productDto,
-        status: ProductStatus.ACTIVE,
+        discountPrice: null,
       } as unknown as UpdateProductDto);
 
-      const [{ data }] = prisma.product.update.mock.calls[0] as [
-        { data: object },
-      ];
-      expect(data).not.toHaveProperty('status');
-      expect(data).toMatchObject({ title: 'White bra' });
+      expect(dataOf(prisma.product.update)).toHaveProperty(
+        'discountPrice',
+        null,
+      );
+    });
+
+    it('answers not found when updating an unknown product', async () => {
+      stored = null;
+
+      await expect(
+        service.update(1, productDto as unknown as UpdateProductDto),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.product.update).not.toHaveBeenCalled();
     });
   });
 
@@ -203,40 +267,54 @@ describe('ProductsService', () => {
     ] as const;
 
     it.each(transitions)(
-      '$name moves $from to $to',
+      '$name moves $from to $to, asserting the source status in the write',
       async ({ name, from, to }) => {
-        prisma.product.findUnique.mockResolvedValue({ status: from });
-        prisma.product.update.mockResolvedValue({ id: 1, status: to });
+        stored = from;
 
-        await service[name](1);
+        await expect(service[name](1)).resolves.toMatchObject({ status: to });
 
-        expect(prisma.product.update).toHaveBeenCalledWith(
-          expect.objectContaining({ where: { id: 1 }, data: { status: to } }),
-        );
+        expect(prisma.product.updateMany).toHaveBeenCalledWith({
+          where: { id: 1, status: from },
+          data: { status: to },
+        });
+        expect(stored).toBe(to);
       },
     );
 
     it.each(transitions)(
-      '$name conflicts from any other status',
+      '$name conflicts from any other status, leaving it untouched',
       async ({ name, from }) => {
         const others = Object.values(ProductStatus).filter(
           (status) => status !== from,
         );
 
         for (const status of others) {
-          prisma.product.findUnique.mockResolvedValue({ status });
+          stored = status;
 
           await expect(service[name](1)).rejects.toBeInstanceOf(
             ConflictException,
           );
+          expect(stored).toBe(status);
         }
-
-        expect(prisma.product.update).not.toHaveBeenCalled();
       },
     );
 
+    it('lets only one of two concurrent publishes win', async () => {
+      stored = ProductStatus.DRAFT;
+
+      const results = await Promise.allSettled([
+        service.publish(1),
+        service.publish(1),
+      ]);
+
+      expect(results.map(({ status }) => status)).toEqual(
+        expect.arrayContaining(['fulfilled', 'rejected']),
+      );
+      expect(stored).toBe(ProductStatus.ACTIVE);
+    });
+
     it('answers not found when the product does not exist', async () => {
-      prisma.product.findUnique.mockResolvedValue(null);
+      stored = null;
 
       await expect(service.publish(1)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -246,16 +324,12 @@ describe('ProductsService', () => {
 
   describe('remove', () => {
     it('deletes a draft along with its variants, sizes and details', async () => {
-      prisma.product.findUnique.mockResolvedValue({
-        status: ProductStatus.DRAFT,
-      });
-      prisma.productVariant.findMany.mockResolvedValue([{ id: 7 }]);
-      prisma.product.delete.mockResolvedValue({ id: 1 });
+      stored = ProductStatus.DRAFT;
 
-      await expect(service.remove(1)).resolves.toEqual({ id: 1 });
+      await expect(service.remove(1)).resolves.toMatchObject({ id: 1 });
 
       expect(prisma.productSize.deleteMany).toHaveBeenCalledWith({
-        where: { variantId: { in: [7] } },
+        where: { variant: { productId: 1 } },
       });
       expect(prisma.productVariant.deleteMany).toHaveBeenCalledWith({
         where: { productId: 1 },
@@ -263,23 +337,40 @@ describe('ProductsService', () => {
       expect(prisma.detail.deleteMany).toHaveBeenCalledWith({
         where: { productId: 1 },
       });
-      expect(prisma.product.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(prisma.product.deleteMany).toHaveBeenCalledWith({
+        where: { id: 1, status: ProductStatus.DRAFT },
+      });
+      expect(stored).toBeNull();
     });
 
     it.each([ProductStatus.ACTIVE, ProductStatus.ARCHIVED])(
       'refuses to delete a %s product',
       async (status) => {
-        prisma.product.findUnique.mockResolvedValue({ status });
+        stored = status;
 
         await expect(service.remove(1)).rejects.toThrow(
           'Only draft products can be permanently deleted',
         );
-        expect(prisma.product.delete).not.toHaveBeenCalled();
+        expect(stored).toBe(status);
       },
     );
 
+    it('conflicts when the product is published while it is being deleted', async () => {
+      stored = ProductStatus.DRAFT;
+
+      // Stands in for a publish committing between the read and the conditional delete.
+      prisma.detail.deleteMany.mockImplementationOnce(() => {
+        stored = ProductStatus.ACTIVE;
+
+        return Promise.resolve({ count: 0 });
+      });
+
+      await expect(service.remove(1)).rejects.toBeInstanceOf(ConflictException);
+      expect(stored).toBe(ProductStatus.ACTIVE);
+    });
+
     it('answers not found when the product does not exist', async () => {
-      prisma.product.findUnique.mockResolvedValue(null);
+      stored = null;
 
       await expect(service.remove(1)).rejects.toBeInstanceOf(NotFoundException);
     });
