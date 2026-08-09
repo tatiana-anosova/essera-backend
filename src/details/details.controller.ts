@@ -12,7 +12,12 @@ import {
 import { UserRole } from '@prisma/client';
 import { DetailsService } from './details.service';
 import { plainToInstance } from 'class-transformer';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -23,7 +28,9 @@ import { CreateDetailDto, UpdateDetailDto, DetailsResponseDto } from './dto';
 export class DetailsController {
   constructor(private readonly detailsService: DetailsService) {}
 
+  @ApiOperation({ summary: 'Details of a product on sale, by product id' })
   @ApiOkResponse({ type: DetailsResponseDto, isArray: true })
+  @ApiNotFoundResponse({ description: 'No `ACTIVE` product with that id' })
   @Get(':productId/details')
   async getByProductId(@Param('productId', ParseIntPipe) productId: number) {
     const details = await this.detailsService.getByProductId(productId);
@@ -32,7 +39,9 @@ export class DetailsController {
     });
   }
 
+  @ApiOperation({ summary: 'Details of a product on sale, by slug' })
   @ApiOkResponse({ type: DetailsResponseDto, isArray: true })
+  @ApiNotFoundResponse({ description: 'No `ACTIVE` product with that slug' })
   @Get('slug/:slug/details')
   async getBySlug(@Param('slug') slug: string) {
     const details = await this.detailsService.getBySlug(slug);

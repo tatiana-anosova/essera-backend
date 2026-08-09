@@ -4,6 +4,7 @@ import { Type } from 'class-transformer';
 import { ProductLabel } from '@prisma/client';
 import { CreateProductVariantDto } from './';
 
+/** `status` is deliberately absent: a created product is always a `DRAFT`. */
 export class CreateProductDto {
   @ApiProperty({ example: 'white-bra' })
   @IsString()

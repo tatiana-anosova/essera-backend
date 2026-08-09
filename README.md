@@ -96,6 +96,24 @@ UPDATE profiles SET role = 'ADMIN' WHERE email = '<your-admin-email>';
 
 ---
 
+## 🛒 Product lifecycle
+
+A product is `DRAFT`, `ACTIVE` or `ARCHIVED`, and the reads are split accordingly:
+
+- `GET /products`, `GET /products/:id`, `GET /products/slug/:slug` and the public details reads
+  (`GET /products/:productId/details`, `GET /products/slug/:slug/details`) — public, and they only
+  ever see `ACTIVE` products; a draft or archived one answers `404`.
+- `/admin/products` — ADMIN only, every status visible, optionally filtered with `?status=DRAFT`.
+
+A product is created as a `DRAFT` and the status is never taken from the request body: it moves
+through `POST /admin/products/:id/publish` (`DRAFT → ACTIVE`), `/archive` (`ACTIVE → ARCHIVED`) and
+`/restore` (`ARCHIVED → ACTIVE`). Any other transition answers `409`. `DELETE /admin/products/:id`
+is permanent and therefore allowed for drafts only; published products are archived instead. The
+transitions and the delete carry the expected source status in the write itself, so two concurrent
+requests cannot both win.
+
+---
+
 ## 📖 API Documentation
 
 Swagger is enabled for local development and used for API exploration and admin-level operations during the MVP phase.

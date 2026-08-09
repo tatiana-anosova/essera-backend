@@ -1,5 +1,6 @@
 // details.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDetailDto, UpdateDetailDto } from './dto';
 
@@ -8,20 +9,34 @@ export class DetailsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getByProductId(productId: number) {
+    await this.activeProduct({ id: productId });
+
     return this.prisma.detail.findMany({
       where: { productId },
     });
   }
 
   async getBySlug(slug: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { slug },
-      select: { id: true },
-    });
-    if (!product) throw new NotFoundException('Product not found');
+    const product = await this.activeProduct({ slug });
+
     return this.prisma.detail.findMany({
       where: { productId: product.id },
     });
+  }
+
+  /**
+   * These reads are unauthenticated, so a draft or archived product is indistinguishable from
+   * a missing one here, exactly as it is on the public product endpoints.
+   */
+  private async activeProduct(where: { id: number } | { slug: string }) {
+    const product = await this.prisma.product.findFirst({
+      where: { ...where, status: ProductStatus.ACTIVE },
+      select: { id: true },
+    });
+
+    if (!product) throw new NotFoundException('Product not found');
+
+    return product;
   }
 
   async add(productId: number, dto: CreateDetailDto) {

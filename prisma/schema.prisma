@@ -13,6 +13,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Lifecycle of a product: only ACTIVE ones are visible on the storefront
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
 // Enum for product label
 enum ProductLabel {
   new
@@ -30,6 +37,7 @@ model Product {
   discount      Int      @default(0)
   discountPrice Float?   // can be undefined/null
   label         ProductLabel @default(empty)
+  status        ProductStatus @default(DRAFT)
   rating        Float?   // can be undefined/null
   reviewsCount  Int?     // can be undefined/null
   category      String?
@@ -38,6 +46,8 @@ model Product {
   details       Detail[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([status])
 }
 
 model ProductVariant {

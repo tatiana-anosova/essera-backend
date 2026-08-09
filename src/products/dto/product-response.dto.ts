@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ProductLabel } from '@prisma/client';
+import { ProductLabel, ProductStatus } from '@prisma/client';
 import { ProductVariantResponseDto } from './';
 
 export class ProductResponseDto {
@@ -32,6 +32,13 @@ export class ProductResponseDto {
 
   @ApiProperty({ example: 'new', enum: ProductLabel })
   label: ProductLabel;
+
+  @ApiProperty({
+    example: 'ACTIVE',
+    enum: ProductStatus,
+    description: 'Only `ACTIVE` products are returned by the public endpoints.',
+  })
+  status: ProductStatus;
 
   @ApiProperty({ example: 4.8, required: false })
   rating: number;
