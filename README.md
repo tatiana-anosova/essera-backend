@@ -114,6 +114,15 @@ requests cannot both win.
 
 ---
 
+## 👥 Users
+
+`GET /admin/users` (ADMIN only) lists the `profiles` rows — user id, both names, email, role and
+registration date — newest first, and takes an optional `?search=` that matches the email or either
+name case-insensitively. It is unpaginated: the admin app sorts and paginates the list it is given.
+Nothing from Supabase's `auth.users` is exposed; a user's own profile is still `GET /users/me`.
+
+---
+
 ## 📖 API Documentation
 
 Swagger is enabled for local development and used for API exploration and admin-level operations during the MVP phase.
