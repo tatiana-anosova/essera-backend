@@ -41,13 +41,19 @@ describe('AdminUsersController', () => {
     ]);
   });
 
-  it('lists the profiles, with the search term when there is one', async () => {
+  it('lists the profiles, passing on the search term and the role filter', async () => {
     usersService.findAllForAdmin.mockResolvedValue([]);
 
     await controller.findAll();
-    expect(usersService.findAllForAdmin).toHaveBeenCalledWith(undefined);
+    expect(usersService.findAllForAdmin).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+    );
 
-    await controller.findAll('tati');
-    expect(usersService.findAllForAdmin).toHaveBeenCalledWith('tati');
+    await controller.findAll('tati', UserRole.ADMIN);
+    expect(usersService.findAllForAdmin).toHaveBeenCalledWith(
+      'tati',
+      UserRole.ADMIN,
+    );
   });
 });

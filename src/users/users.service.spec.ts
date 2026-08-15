@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from './users.service';
 
@@ -31,7 +32,7 @@ describe('UsersService', () => {
       await service.findAllForAdmin();
 
       expect(prisma.profile.findMany).toHaveBeenCalledWith({
-        where: undefined,
+        where: { role: undefined, OR: undefined },
         select: {
           userId: true,
           firstName: true,
@@ -61,11 +62,22 @@ describe('UsersService', () => {
     it('treats a blank search as no search at all', async () => {
       await service.findAllForAdmin('   ');
 
-      const [call] = prisma.profile.findMany.mock.calls.at(0) as [
-        { where?: unknown },
+      const [{ where }] = prisma.profile.findMany.mock.calls.at(0) as [
+        { where: { OR?: unknown } },
       ];
 
-      expect(call).toHaveProperty('where', undefined);
+      expect(where.OR).toBeUndefined();
+    });
+
+    it('filters on the role, alongside the search rather than instead of it', async () => {
+      await service.findAllForAdmin('tati', UserRole.ADMIN);
+
+      const [{ where }] = prisma.profile.findMany.mock.calls.at(0) as [
+        { where: { role?: UserRole; OR?: unknown[] } },
+      ];
+
+      expect(where.role).toBe(UserRole.ADMIN);
+      expect(where.OR).toHaveLength(3);
     });
   });
 });
