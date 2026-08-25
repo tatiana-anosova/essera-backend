@@ -15,6 +15,8 @@ export class DetailsResponseDto {
   title: string;
 
   @Expose()
-  @ApiProperty({ example: `Model is 5'9" and wears size S. True to size fit. Unlined, underwire support.` })
+  @ApiProperty({
+    example: `Model is 5'9" and wears size S. True to size fit. Unlined, underwire support.`,
+  })
   content: string;
 }

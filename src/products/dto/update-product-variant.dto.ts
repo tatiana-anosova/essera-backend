@@ -14,7 +14,10 @@ export class UpdateProductVariantDto {
   @IsString()
   colorHex?: string;
 
-  @ApiProperty({ example: ['white-bra-1.jpg', 'white-bra-2.jpg'], required: false })
+  @ApiProperty({
+    example: ['white-bra-1.jpg', 'white-bra-2.jpg'],
+    required: false,
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })

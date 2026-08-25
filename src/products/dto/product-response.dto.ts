@@ -12,7 +12,10 @@ export class ProductResponseDto {
   @ApiProperty({ example: 'Where softness meets quiet confidence' })
   title: string;
 
-  @ApiProperty({ example: 'Minimal lingerie for women who choose calm, confidence, and comfort.' })
+  @ApiProperty({
+    example:
+      'Minimal lingerie for women who choose calm, confidence, and comfort.',
+  })
   description: string;
 
   @ApiProperty({ example: 'bra' })

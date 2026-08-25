@@ -10,7 +10,7 @@ export class UsersController {
   @UseGuards(SupabaseAuthGuard)
   @Get('me')
   async me(@Req() req: Request) {
-    const { id, email } = (req as any).user as {id: string; email?: string};
+    const { id, email } = req.user ?? { id: '', email: undefined };
     const profile = await this.usersService.getProfile(id);
 
     return {
