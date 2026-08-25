@@ -8,7 +8,13 @@ import { DetailsModule } from './details/details.module';
 import { ContactMessagesModule } from './contact-messages/contact-messages.module';
 
 @Module({
-  imports: [PrismaModule, UsersModule, ProductsModule, DetailsModule, ContactMessagesModule],
+  imports: [
+    PrismaModule,
+    UsersModule,
+    ProductsModule,
+    DetailsModule,
+    ContactMessagesModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

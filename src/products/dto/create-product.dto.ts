@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsString, IsNumber, IsArray, IsOptional, ValidateNested } from 'class-validator';
+import {
+  IsEnum,
+  IsString,
+  IsNumber,
+  IsArray,
+  IsOptional,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductLabel } from '@prisma/client';
 import { CreateProductVariantDto } from './';
@@ -14,7 +21,10 @@ export class CreateProductDto {
   @IsString()
   title: string;
 
-  @ApiProperty({ example: 'Minimal lingerie for women who choose calm, confidence, and comfort.' })
+  @ApiProperty({
+    example:
+      'Minimal lingerie for women who choose calm, confidence, and comfort.',
+  })
   @IsString()
   description: string;
 
