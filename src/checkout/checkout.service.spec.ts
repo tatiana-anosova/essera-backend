@@ -38,6 +38,8 @@ const line = (overrides: Record<string, unknown> = {}) => ({
 
 const session = {
   id: 'cs_test_1',
+  metadata: { orderId: 'order-1' },
+  client_reference_id: 'order-1',
   url: 'https://checkout.stripe.com/c/pay/cs_test_1',
   payment_status: 'paid',
   payment_intent: 'pi_1',
@@ -249,6 +251,22 @@ describe('CheckoutService', () => {
   describe('handleWebhook', () => {
     const payload = Buffer.from('{}');
 
+    it('still reaches the order when the session id has not been stored yet', async () => {
+      stripe.constructEvent.mockReturnValue({
+        id: 'evt_5',
+        type: 'checkout.session.completed',
+        data: { object: { ...session, id: 'cs_unstored' } },
+      });
+
+      await service.handleWebhook(payload, 'sig');
+
+      const [{ where }] = prisma.order.updateMany.mock.calls[0] as [
+        { where: { OR: unknown[] } },
+      ];
+
+      expect(where.OR).toContainEqual({ id: 'order-1' });
+    });
+
     it('marks the order paid for a verified event', async () => {
       const result = await service.handleWebhook(payload, 'sig');
 
@@ -261,7 +279,7 @@ describe('CheckoutService', () => {
       ];
 
       expect(where).toEqual({
-        stripeSessionId: 'cs_test_1',
+        OR: [{ stripeSessionId: 'cs_test_1' }, { id: 'order-1' }],
         status: OrderStatus.PENDING,
       });
       expect(data).toMatchObject({
