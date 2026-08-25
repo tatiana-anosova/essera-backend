@@ -6,5 +6,4 @@ import { ContactMessagesService } from './contact-service.service';
   controllers: [ContactMessagesController],
   providers: [ContactMessagesService],
 })
-
 export class ContactMessagesModule {}
