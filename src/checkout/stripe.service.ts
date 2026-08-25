@@ -59,7 +59,7 @@ export class StripeService {
   }): Promise<Stripe.Checkout.Session> {
     return this.client.checkout.sessions.create({
       mode: 'payment',
-      // Lets Stripe drop a duplicate create if the storefront retries the request.
+      // Carries the order id back on every event and shows it in the dashboard.
       client_reference_id: params.orderId,
       customer_email: params.email,
       metadata: { orderId: params.orderId },

@@ -104,6 +104,11 @@ export class CheckoutService {
     }
 
     if (!session.url) {
+      await this.prisma.order.updateMany({
+        where: { id: order.id, status: OrderStatus.PENDING },
+        data: { status: OrderStatus.FAILED },
+      });
+
       throw new ServiceUnavailableException('Could not start the payment');
     }
 
@@ -171,6 +176,7 @@ export class CheckoutService {
     if (!status) return { received: true, handled: false };
 
     const session = event.data.object as Stripe.Checkout.Session;
+    const orderId = session.metadata?.orderId ?? session.client_reference_id;
 
     // A completed session can still be awaiting an asynchronous payment method.
     const resolved =
@@ -188,11 +194,16 @@ export class CheckoutService {
           data: { id: event.id, type: event.type },
         });
 
+        // Matching on the order id as well as the session id closes the window
+        // between creating the session and storing its id on the order.
         // Only a pending order transitions, so a duplicate event — or a late
         // expiry after a payment — can never move an order twice.
         await tx.order.updateMany({
           where: {
-            stripeSessionId: session.id,
+            OR: [
+              { stripeSessionId: session.id },
+              ...(orderId ? [{ id: orderId }] : []),
+            ],
             status: OrderStatus.PENDING,
           },
           data: {
