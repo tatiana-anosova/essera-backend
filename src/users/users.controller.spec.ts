@@ -19,7 +19,7 @@ describe('UsersController', () => {
       controllers: [UsersController],
       providers: [{ provide: UsersService, useValue: usersService }],
     })
-      // The real guard needs a Supabase project; the routes are called directly here.
+      // The real guard reads the Supabase configuration as it is constructed.
       .overrideGuard(SupabaseAuthGuard)
       .useValue({ canActivate: () => true })
       .compile();

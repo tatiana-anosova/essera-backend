@@ -7,7 +7,6 @@ import {
   Param,
   ParseEnumPipe,
   ParseIntPipe,
-  PipeTransform,
   Post,
   Put,
   Query,
@@ -25,18 +24,12 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ProductStatus, UserRole } from '@prisma/client';
+import { BlankAsUnsetPipe } from '../common/blank-as-unset.pipe';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ProductsService } from './products.service';
 import { CreateProductDto, ProductResponseDto, UpdateProductDto } from './dto';
-
-/** `?status=` with no value means "no filter", rather than an invalid enum value. */
-export class BlankAsUnsetPipe implements PipeTransform<string | undefined> {
-  transform(value: string | undefined) {
-    return value === '' ? undefined : value;
-  }
-}
 
 @ApiTags('admin/products')
 @ApiBearerAuth()

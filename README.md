@@ -114,6 +114,16 @@ requests cannot both win.
 
 ---
 
+## 👥 Users
+
+`GET /admin/users` (ADMIN only) lists the `profiles` rows — user id, both names, email, role and
+registration date — newest first. It takes an optional `?search=` that matches the email or either
+name case-insensitively, and an optional `?role=ADMIN|CUSTOMER` (blank means no filter, as with
+`?status=`). It is unpaginated: the admin app sorts and paginates the list it is given.
+Nothing from Supabase's `auth.users` is exposed; a user's own profile is still `GET /users/me`.
+
+---
+
 ## 💳 Checkout & payments
 
 Checkout uses **Stripe Checkout Sessions**: the storefront posts the cart, the backend prices it and

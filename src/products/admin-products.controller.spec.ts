@@ -1,9 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductStatus, UserRole } from '@prisma/client';
-import {
-  AdminProductsController,
-  BlankAsUnsetPipe,
-} from './admin-products.controller';
+import { AdminProductsController } from './admin-products.controller';
+import { BlankAsUnsetPipe } from '../common/blank-as-unset.pipe';
 import { ProductsService } from './products.service';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
