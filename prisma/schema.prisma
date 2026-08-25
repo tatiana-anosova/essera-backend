@@ -71,6 +71,60 @@ model ProductSize {
   quantity   Int
 }
 
+// Payment state of an order. Fulfilment is deliberately not modelled yet.
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model Order {
+  id                    String      @id @default(uuid())
+  // Supabase user when the buyer is signed in; guest checkout leaves it null.
+  userId                String?     @db.Uuid
+  email                 String?
+  status                OrderStatus @default(PENDING)
+  currency              String      @default("usd")
+  // Minor units (cents), as sent to and charged by Stripe.
+  totalAmount           Int
+  stripeSessionId       String?     @unique
+  stripePaymentIntentId String?
+  paidAt                DateTime?
+  items                 OrderItem[]
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// A purchase snapshot: everything needed to render the line later, even if the
+// product is edited, archived or deleted afterwards.
+model OrderItem {
+  id        Int    @id @default(autoincrement())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId Int?
+  sizeId    Int?
+  title     String
+  variant   String
+  size      String
+  // Minor units (cents) actually charged for one unit.
+  unitPrice Int
+  quantity  Int
+
+  @@index([orderId])
+}
+
+// Consumed Stripe event ids. The insert is the idempotency lock: a redelivered
+// event hits the primary key and is acknowledged without being replayed.
+model StripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+}
+
 model Detail {
   id        Int      @id @default(autoincrement())
   key       String   // например, 'fabric', 'fit', 'shipping'
