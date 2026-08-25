@@ -27,6 +27,20 @@ describe('UsersService', () => {
     expect(service).toBeDefined();
   });
 
+  it('reads the profile of the given user', async () => {
+    prisma.profile.findUnique.mockResolvedValue({ firstName: 'Ada' });
+
+    await expect(service.getProfile('user-1')).resolves.toEqual({
+      firstName: 'Ada',
+    });
+
+    const [{ where }] = prisma.profile.findUnique.mock.calls[0] as [
+      { where: { userId: string } },
+    ];
+
+    expect(where).toEqual({ userId: 'user-1' });
+  });
+
   describe('findAllForAdmin', () => {
     it('reads every profile, newest first, and nothing beyond the listed columns', async () => {
       await service.findAllForAdmin();

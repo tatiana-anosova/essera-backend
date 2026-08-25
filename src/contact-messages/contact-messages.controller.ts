@@ -12,6 +12,6 @@ export class ContactMessagesController {
     @Ip() ip: string,
     @Headers('user-agent') ua: string,
   ) {
-    return this.service.create({... dto, ip, userAgent: ua})
+    return this.service.create({ ...dto, ip, userAgent: ua });
   }
 }

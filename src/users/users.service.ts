@@ -10,7 +10,7 @@ export class UsersService {
     return this.prisma.profile.findUnique({
       where: { userId },
       select: { firstName: true, lastName: true, email: true, role: true },
-    })
+    });
   }
 
   /**
