@@ -124,6 +124,75 @@ Nothing from Supabase's `auth.users` is exposed; a user's own profile is still `
 
 ---
 
+## 💳 Checkout & payments
+
+Checkout uses **Stripe Checkout Sessions**: the storefront posts the cart, the backend prices it and
+answers with a hosted Stripe URL to redirect to. No card data ever reaches this service.
+
+### API
+
+| Endpoint | Auth | Description |
+| --- | --- | --- |
+| `POST /checkout/payment` | optional bearer token | Prices the cart server-side, creates a `PENDING` order and a Stripe session |
+| `GET /checkout/payment/:orderId` | public | Payment state of an order, for the page the buyer returns to |
+| `POST /checkout/stripe/webhook` | Stripe signature | The only way an order becomes `PAID` |
+
+Request:
+
+```json
+{ "items": [{ "productId": 1, "variant": "black", "size": "34B", "quantity": 2 }],
+  "email": "guest@example.com" }
+```
+
+Response (`201`): `{ "orderId", "sessionId", "url", "amount", "currency" }` — `amount` is in minor
+units (cents). The client sends no prices: the unit price is always `discountPrice ?? basePrice` read
+from the database, and any price or total in the request body is ignored.
+
+Errors: `404` for an unknown product, variant or size, `409` for a product that is not `ACTIVE` or
+for insufficient stock, `400` for an invalid quantity, `503` when Stripe refuses the session (the
+provider message is logged, never returned).
+
+### Order model
+
+`Order` holds the payment state (`PENDING` → `PAID` / `FAILED` / `CANCELLED`), the total in minor
+units and the Stripe session/payment-intent ids. `OrderItem` is a purchase snapshot — title, variant,
+size, unit price paid and quantity — so order history never depends on the current product row.
+Admin order management, refunds and fulfilment are out of scope.
+
+### Webhook
+
+The signature is verified against the raw request body (the app is bootstrapped with `rawBody: true`)
+using `STRIPE_WEBHOOK_SECRET`; an invalid signature answers `400`. Only
+`checkout.session.completed`, `.async_payment_succeeded`, `.async_payment_failed` and `.expired` are
+acted on, everything else is acknowledged and ignored. Handling is idempotent: the Stripe event id is
+inserted into `StripeEvent` inside the same transaction as the order transition, and the transition
+itself only ever moves a `PENDING` order, so a redelivery changes nothing. The browser redirect back
+from Stripe is never treated as proof of payment.
+
+Point a Stripe webhook endpoint at `https://<api-host>/checkout/stripe/webhook` and subscribe it to
+those four events, or forward locally with `stripe listen --forward-to
+localhost:3001/checkout/stripe/webhook`.
+
+### Stock — MVP behaviour
+
+Stock is **validated but not reserved**: a checkout that exceeds `ProductSize.quantity` is rejected,
+and no inventory is written when the session is created, so an abandoned checkout never locks stock.
+Two buyers can therefore both pay for the last item; the schema has no reservation concept yet, and
+adding one (a hold with an expiry, or a decrement on the paid webhook) is deliberately left out.
+
+### Configuration
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `STRIPE_SECRET_KEY` | **yes** | Stripe secret API key; the app refuses to start without it |
+| `STRIPE_WEBHOOK_SECRET` | **yes** | Signing secret of the webhook endpoint |
+| `STOREFRONT_URL` | **yes** | Storefront origin the Stripe success/cancel URLs are built from |
+| `CHECKOUT_CURRENCY` | no | Defaults to `usd` |
+| `CHECKOUT_SUCCESS_URL` | no | Overrides the derived success URL |
+| `CHECKOUT_CANCEL_URL` | no | Overrides the derived cancel URL |
+
+---
+
 ## 📖 API Documentation
 
 Swagger is enabled for local development and used for API exploration and admin-level operations during the MVP phase.
