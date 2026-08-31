@@ -14,6 +14,7 @@ import {
   CheckoutItemDto,
   CheckoutPaymentResponseDto,
   CreateCheckoutPaymentDto,
+  ShippingAddressDto,
 } from './dto';
 
 /** A validated line, priced from the database. `unitPrice` is in minor units. */
@@ -39,6 +40,18 @@ const lineKey = (item: CheckoutItemDto) =>
   [item.productId, item.variant, item.size].join('|');
 
 const toMinorUnits = (price: number) => Math.round(price * 100);
+
+const shippingColumns = (shipping?: ShippingAddressDto) => ({
+  shippingCountry: shipping?.country ?? null,
+  shippingFirstName: shipping?.firstName ?? null,
+  shippingLastName: shipping?.lastName ?? null,
+  shippingAddress: shipping?.address ?? null,
+  shippingApartments: shipping?.apartments ?? null,
+  shippingCity: shipping?.city ?? null,
+  shippingState: shipping?.state ?? null,
+  shippingZip: shipping?.zip ?? null,
+  shippingPhone: shipping?.phone ?? null,
+});
 
 @Injectable()
 export class CheckoutService {
@@ -71,6 +84,7 @@ export class CheckoutService {
         status: OrderStatus.PENDING,
         currency: this.stripe.currency,
         totalAmount,
+        ...shippingColumns(dto.shipping),
         items: { create: lines },
       },
     });

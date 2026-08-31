@@ -141,8 +141,13 @@ Request:
 
 ```json
 { "items": [{ "productId": 1, "variant": "black", "size": "34B", "quantity": 2 }],
-  "email": "guest@example.com" }
+  "email": "guest@example.com",
+  "shipping": { "country": "United States", "firstName": "Ada", "lastName": "Lovelace",
+    "address": "1 Infinite Loop", "apartments": "Apt 4", "city": "Cupertino",
+    "state": "CA", "zip": "95014", "phone": "+1 (555) 010-1234" } }
 ```
+
+`shipping` is optional and stored on the order for fulfilment; it never affects pricing.
 
 Response (`201`): `{ "orderId", "sessionId", "url", "amount", "currency" }` — `amount` is in minor
 units (cents). The client sends no prices: the unit price is always `discountPrice ?? basePrice` read
@@ -181,6 +186,8 @@ Two buyers can therefore both pay for the last item; the schema has no reservati
 adding one (a hold with an expiry, or a decrement on the paid webhook) is deliberately left out.
 
 ### Configuration
+
+See `.env.example` for a complete, copyable list.
 
 | Variable | Required | Description |
 | --- | --- | --- |
