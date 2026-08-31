@@ -91,6 +91,16 @@ model Order {
   stripeSessionId       String?     @unique
   stripePaymentIntentId String?
   paidAt                DateTime?
+  // Delivery address as typed by the buyer, kept for fulfilment.
+  shippingCountry       String?
+  shippingFirstName     String?
+  shippingLastName      String?
+  shippingAddress       String?
+  shippingApartments    String?
+  shippingCity          String?
+  shippingState         String?
+  shippingZip           String?
+  shippingPhone         String?
   items                 OrderItem[]
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt

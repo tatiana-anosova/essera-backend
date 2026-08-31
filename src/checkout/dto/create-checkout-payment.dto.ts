@@ -12,6 +12,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { ShippingAddressDto } from './shipping-address.dto';
 
 export const MAX_LINE_QUANTITY = 20;
 export const MAX_CHECKOUT_LINES = 50;
@@ -58,4 +59,14 @@ export class CreateCheckoutPaymentDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @ApiProperty({
+    required: false,
+    type: ShippingAddressDto,
+    description: 'Delivery address; stored on the order for fulfilment.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ShippingAddressDto)
+  shipping?: ShippingAddressDto;
 }

@@ -187,6 +187,49 @@ describe('CheckoutService', () => {
       });
     });
 
+    it('stores the delivery address on the order', async () => {
+      await service.createPayment({
+        items: [line()],
+        shipping: {
+          country: 'United States',
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          address: '1 Infinite Loop',
+          apartments: 'Apt 4',
+          city: 'Cupertino',
+          state: 'CA',
+          zip: '95014',
+          phone: '+1 (555) 010-1234',
+        },
+      });
+
+      const [{ data }] = prisma.order.create.mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+
+      expect(data).toMatchObject({
+        shippingCountry: 'United States',
+        shippingFirstName: 'Ada',
+        shippingLastName: 'Lovelace',
+        shippingAddress: '1 Infinite Loop',
+        shippingApartments: 'Apt 4',
+        shippingCity: 'Cupertino',
+        shippingState: 'CA',
+        shippingZip: '95014',
+        shippingPhone: '+1 (555) 010-1234',
+      });
+    });
+
+    it('accepts a checkout without a delivery address', async () => {
+      await service.createPayment({ items: [line()] });
+
+      const [{ data }] = prisma.order.create.mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+
+      expect(data.shippingAddress).toBeNull();
+    });
+
     it.each([ProductStatus.DRAFT, ProductStatus.ARCHIVED])(
       'refuses a %s product',
       async (status) => {
