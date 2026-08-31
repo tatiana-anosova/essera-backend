@@ -7,6 +7,7 @@ import { ProductsModule } from './products/products.module';
 import { DetailsModule } from './details/details.module';
 import { ContactMessagesModule } from './contact-messages/contact-messages.module';
 import { CheckoutModule } from './checkout/checkout.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { CheckoutModule } from './checkout/checkout.module';
     DetailsModule,
     ContactMessagesModule,
     CheckoutModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
